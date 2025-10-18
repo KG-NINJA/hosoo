@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Step Resonance</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Nunito", "Hiragino Kaku Gothic Pro", "Yu Gothic", sans-serif;
+      --glow: #73e7ff;
+      --bg: #050505;
+      --accent: #ff6bce;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, rgba(35, 76, 115, 0.25), transparent 60%), var(--bg);
+      color: #e7faff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: env(safe-area-inset-top, 1.5rem) 1.5rem env(safe-area-inset-bottom, 1.5rem);
+    }
+
+    main {
+      width: min(480px, 100%);
+      border: 1px solid rgba(115, 231, 255, 0.2);
+      border-radius: 24px;
+      padding: 2rem 1.75rem;
+      background: rgba(5, 5, 5, 0.8);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 0 40px rgba(115, 231, 255, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ambient-ring {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(115, 231, 255, 0.15), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    .ambient-ring.visible {
+      opacity: 1;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .brand {
+      letter-spacing: 0.25em;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: rgba(231, 250, 255, 0.6);
+    }
+
+    button {
+      background: rgba(115, 231, 255, 0.12);
+      border: 1px solid rgba(115, 231, 255, 0.3);
+      border-radius: 999px;
+      color: #e7faff;
+      padding: 0.65rem 1.5rem;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s ease, border 0.3s ease;
+      font-family: inherit;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button:not(:disabled):active {
+      transform: translateY(1px);
+    }
+
+    .lang-toggle {
+      padding: 0.45rem 1.1rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    #title {
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      margin: 0 0 0.75rem;
+      font-weight: 700;
+      text-align: center;
+      text-shadow: 0 0 16px rgba(115, 231, 255, 0.6);
+      letter-spacing: 0.08em;
+    }
+
+    #step-count {
+      font-size: clamp(3.5rem, 12vw, 4.8rem);
+      margin: 0;
+      text-align: center;
+      font-weight: 800;
+      color: var(--glow);
+      text-shadow: 0 0 24px rgba(115, 231, 255, 0.65);
+    }
+
+    .milestone-hint {
+      text-align: center;
+      color: rgba(231, 250, 255, 0.55);
+      margin-top: 0.3rem;
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-top: 2rem;
+    }
+
+    .status-line {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      text-align: center;
+      color: rgba(231, 250, 255, 0.6);
+      min-height: 1.2rem;
+    }
+
+    .title-animate {
+      animation: pulse 1.8s ease-out forwards;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.92);
+        opacity: 0.2;
+        text-shadow: 0 0 0 rgba(255, 107, 206, 0.8);
+      }
+      50% {
+        transform: scale(1.06);
+        opacity: 1;
+        text-shadow: 0 0 35px rgba(255, 107, 206, 0.8);
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+        text-shadow: 0 0 18px rgba(115, 231, 255, 0.6);
+      }
+    }
+
+    .particle-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: radial-gradient(circle, rgba(115, 231, 255, 0.8), transparent 70%);
+      border-radius: 50%;
+      animation: rise 6s linear infinite;
+      opacity: 0;
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translateY(40px) scale(0.5);
+        opacity: 0;
+      }
+      10% {
+        opacity: 0.8;
+      }
+      80% {
+        opacity: 0.8;
+      }
+      100% {
+        transform: translateY(-320px) scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="ambient-ring" id="ambient-ring"></div>
+    <div class="particle-layer" id="particle-layer" aria-hidden="true"></div>
+    <header>
+      <span class="brand" id="brand">STEP RESONANCE</span>
+      <button class="lang-toggle" id="toggle-lang" type="button">EN</button>
+    </header>
+
+    <section>
+      <h1 id="title">霧を待つ者</h1>
+      <p id="step-count">0</p>
+      <p class="milestone-hint" id="milestone-hint"></p>
+    </section>
+
+    <div class="controls">
+      <button id="start-button" type="button">開始</button>
+      <button id="share-button" type="button" disabled>シェア</button>
+    </div>
+
+    <p class="status-line" id="status-line"></p>
+  </main>
+
+  <script>
+    const text = {
+      ja: {
+        brand: "STEP RESONANCE",
+        start: "開始",
+        share: "シェア",
+        defaultTitle: "霧を待つ者",
+        statusReady: "デバイスのモーションを許可してください",
+        statusTracking: "足取りを感じ取っています…",
+        statusDenied: "モーションセンサーへのアクセスが拒否されました",
+        statusUnsupported: "歩数センサーを初期化できませんでした",
+        nextMilestone: (steps) => `次の称号まであと ${steps} 歩`,
+        shareText: (title, steps) => `${title} / ${steps.toLocaleString()} 歩`,
+      },
+      en: {
+        brand: "STEP RESONANCE",
+        start: "Begin",
+        share: "Share",
+        defaultTitle: "Seeker of Mists",
+        statusReady: "Allow motion sensing to begin",
+        statusTracking: "Tracing your resonance…",
+        statusDenied: "Motion sensor access was denied",
+        statusUnsupported: "Unable to initialise the step sensor",
+        nextMilestone: (steps) => `${steps} steps to the next title`,
+        shareText: (title, steps) => `${title} / ${steps.toLocaleString()} steps`,
+      }
+    };
+
+    const milestoneSet = [
+      { value: 1000, id: "mist", title: { ja: "霧を切り裂く者", en: "Cutter of Mist" }, hue: 195 },
+      { value: 5000, id: "light", title: { ja: "光を追う者", en: "Chaser of Light" }, hue: 285 },
+      { value: 10000, id: "world", title: { ja: "世界を渡る者", en: "Voyager of Worlds" }, hue: 35 }
+    ];
+
+    const storageKeyPrefix = "step-resonance-";
+    const langChoiceKey = "step-resonance-lang";
+
+    const titleEl = document.getElementById("title");
+    const stepCountEl = document.getElementById("step-count");
+    const startBtn = document.getElementById("start-button");
+    const shareBtn = document.getElementById("share-button");
+    const statusLine = document.getElementById("status-line");
+    const toggleLangBtn = document.getElementById("toggle-lang");
+    const milestoneHintEl = document.getElementById("milestone-hint");
+    const ambientRing = document.getElementById("ambient-ring");
+    const particleLayer = document.getElementById("particle-layer");
+    const brandEl = document.getElementById("brand");
+
+    let language = localStorage.getItem(langChoiceKey) || (navigator.language?.startsWith("ja") ? "ja" : "en");
+    let stepCount = 0;
+    let lastMagnitude = 0;
+    let lastStepTime = 0;
+    let currentMilestoneIndex = -1;
+    let milestoneLock = false;
+    let audioCtx;
+    let ambientGain;
+    let rafId;
+    let tracking = false;
+
+    const particles = [];
+
+    function createParticles() {
+      const total = 30;
+      for (let i = 0; i < total; i += 1) {
+        const p = document.createElement("div");
+        p.className = "particle";
+        const delay = Math.random() * -6;
+        p.style.left = `${Math.random() * 100}%`;
+        p.style.animationDelay = `${delay}s`;
+        particleLayer.appendChild(p);
+        particles.push(p);
+      }
+    }
+
+    function getTodayKey() {
+      const today = new Date();
+      return `${storageKeyPrefix}${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    }
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem(getTodayKey());
+        if (!raw) {
+          return;
+        }
+        const saved = JSON.parse(raw);
+        if (typeof saved.steps === "number") {
+          stepCount = saved.steps;
+          updateMilestone(saved.milestoneIndex ?? -1, true);
+          render();
+        }
+      } catch (error) {
+        console.warn("Failed to load progress", error);
+      }
+    }
+
+    function storeProgress() {
+      try {
+        const payload = {
+          steps: stepCount,
+          milestoneIndex: currentMilestoneIndex,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(getTodayKey(), JSON.stringify(payload));
+      } catch (error) {
+        console.warn("Failed to save progress", error);
+      }
+    }
+
+    function setLanguage(target) {
+      language = target;
+      localStorage.setItem(langChoiceKey, target);
+      toggleLangBtn.textContent = language === "ja" ? "EN" : "日本語";
+      startBtn.textContent = text[language].start;
+      shareBtn.textContent = text[language].share;
+      brandEl.textContent = text[language].brand;
+      if (!tracking) {
+        statusLine.textContent = text[language].statusReady;
+      }
+      if (currentMilestoneIndex < 0) {
+        titleEl.textContent = text[language].defaultTitle;
+      } else {
+        const entry = milestoneSet[currentMilestoneIndex];
+        titleEl.textContent = entry.title[language];
+      }
+      updateMilestoneHint();
+    }
+
+    function updateMilestoneHint() {
+      const next = milestoneSet.find((m) => m.value > stepCount);
+      if (!next) {
+        milestoneHintEl.textContent = "";
+        return;
+      }
+      const remaining = next.value - stepCount;
+      milestoneHintEl.textContent = text[language].nextMilestone(remaining);
+    }
+
+    function render() {
+      stepCountEl.textContent = stepCount.toLocaleString();
+      updateMilestoneHint();
+      shareBtn.disabled = !tracking && !stepCount;
+      storeProgress();
+    }
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        ambientGain = audioCtx.createGain();
+        ambientGain.gain.value = 0;
+        ambientGain.connect(audioCtx.destination);
+      }
+    }
+
+    function playMilestoneSound(hue) {
+      ensureAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(660, now + 0.35);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(0.6, now + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 1.2);
+
+      ambientRing.style.setProperty("background", `radial-gradient(circle, hsla(${hue}, 100%, 65%, 0.3), transparent 70%)`);
+      ambientRing.classList.add("visible");
+      setTimeout(() => ambientRing.classList.remove("visible"), 1400);
+    }
+
+    function updateMilestone(index, silent = false) {
+      if (currentMilestoneIndex === index) {
+        return;
+      }
+      currentMilestoneIndex = index;
+      if (index < 0) {
+        titleEl.textContent = text[language].defaultTitle;
+        titleEl.classList.remove("title-animate");
+        void titleEl.offsetWidth;
+        titleEl.classList.add("title-animate");
+        return;
+      }
+      const milestone = milestoneSet[index];
+      titleEl.textContent = milestone.title[language];
+      titleEl.style.setProperty("color", `hsl(${milestone.hue}, 90%, 72%)`);
+      titleEl.classList.remove("title-animate");
+      void titleEl.offsetWidth;
+      titleEl.classList.add("title-animate");
+      if (!silent) {
+        playMilestoneSound(milestone.hue);
+      }
+    }
+
+    function checkMilestones() {
+      let achievedIndex = -1;
+      for (let i = milestoneSet.length - 1; i >= 0; i -= 1) {
+        if (stepCount >= milestoneSet[i].value) {
+          achievedIndex = i;
+          break;
+        }
+      }
+      if (achievedIndex !== currentMilestoneIndex) {
+        updateMilestone(achievedIndex);
+      }
+    }
+
+    function handleMotion(event) {
+      if (!tracking || milestoneLock) {
+        return;
+      }
+      const acc = event.accelerationIncludingGravity;
+      if (!acc) {
+        return;
+      }
+      const magnitude = Math.sqrt((acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2);
+      const delta = Math.abs(magnitude - lastMagnitude);
+      lastMagnitude = magnitude;
+      const now = performance.now();
+      if (delta > 2.1 && now - lastStepTime > 260) {
+        lastStepTime = now;
+        stepCount += 1;
+        checkMilestones();
+        render();
+      }
+    }
+
+    async function requestPermission() {
+      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+        try {
+          const response = await DeviceMotionEvent.requestPermission();
+          if (response !== "granted") {
+            statusLine.textContent = text[language].statusDenied;
+            return false;
+          }
+        } catch (error) {
+          statusLine.textContent = text[language].statusDenied;
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function startAmbientLoop() {
+      ensureAudio();
+      if (!audioCtx) {
+        return;
+      }
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(120, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 2);
+      osc.connect(gain);
+      gain.connect(ambientGain);
+      osc.start(now);
+      osc.stop(now + 6);
+    }
+
+    function scheduleAmbient() {
+      if (!tracking) {
+        return;
+      }
+      startAmbientLoop();
+      rafId = setTimeout(scheduleAmbient, 7000);
+    }
+
+    async function startTracking() {
+      if (tracking) {
+        return;
+      }
+      const granted = await requestPermission();
+      if (!granted) {
+        return;
+      }
+      if (!("ondevicemotion" in window)) {
+        statusLine.textContent = text[language].statusUnsupported;
+        return;
+      }
+      tracking = true;
+      shareBtn.disabled = false;
+      startBtn.disabled = true;
+      statusLine.textContent = text[language].statusTracking;
+      ensureAudio();
+      scheduleAmbient();
+      window.addEventListener("devicemotion", handleMotion, { passive: true });
+    }
+
+    toggleLangBtn.addEventListener("click", () => {
+      setLanguage(language === "ja" ? "en" : "ja");
+    });
+
+    startBtn.addEventListener("click", async () => {
+      await startTracking();
+    });
+
+    shareBtn.addEventListener("click", async () => {
+      const currentTitle = currentMilestoneIndex >= 0 ? milestoneSet[currentMilestoneIndex].title[language] : text[language].defaultTitle;
+      const shareText = text[language].shareText(currentTitle, stepCount);
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "Step Resonance",
+            text: shareText,
+            url: window.location.href
+          });
+        } catch (error) {
+          console.warn("Share dismissed", error);
+        }
+      } else {
+        const intent = new URL("https://twitter.com/intent/tweet");
+        intent.searchParams.set("text", shareText);
+        window.open(intent.toString(), "_blank", "noopener");
+      }
+    });
+
+    function init() {
+      createParticles();
+      setLanguage(language);
+      statusLine.textContent = text[language].statusReady;
+      loadProgress();
+      render();
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (tracking) {
+        window.removeEventListener("devicemotion", handleMotion);
+      }
+      if (rafId) {
+        clearTimeout(rafId);
+      }
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch((error) => {
+          console.warn("Service worker registration failed", error);
+        });
+      });
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!audioCtx) {
+        return;
+      }
+      if (document.hidden) {
+        ambientGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      } else if (tracking) {
+        ambientGain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 1.5);
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

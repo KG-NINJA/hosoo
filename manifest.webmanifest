@@ -1,0 +1,9 @@
+{
+  "name": "Step Resonance",
+  "short_name": "Resonance",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": []
+}

@@ -136,6 +136,14 @@
       min-height: 1.2rem;
     }
 
+    .support-line {
+      margin-top: 0.75rem;
+      font-size: 0.78rem;
+      text-align: center;
+      color: rgba(231, 250, 255, 0.45);
+      min-height: 1.2rem;
+    }
+
     .title-animate {
       animation: pulse 1.8s ease-out forwards;
     }
@@ -224,6 +232,7 @@
     </div>
 
     <p class="status-line" id="status-line"></p>
+    <p class="support-line" id="support-line"></p>
   </main>
 
   <script>
@@ -245,6 +254,10 @@
         statusSyncUnsupported: "ブラウザから端末の歩数データへアクセスできません",
         statusSyncSuccess: (steps) => `端末の歩数 ${steps.toLocaleString()} を同期しました`,
         statusWakeLockFailed: "画面を保持できませんでした。歩数取得が停止する可能性があります",
+        hintNoPedometer: "iOSブラウザでは端末歩数の同期に対応していません",
+        hintNoWakeLock: "画面スリープ中は計測が停止する場合があります",
+        statusBackgroundSyncEnabled: "バックグラウンド歩数計測が有効です",
+        statusBackgroundSyncFailed: "バックグラウンド歩数計測を有効にできませんでした",
       },
       en: {
         brand: "STEP RESONANCE",
@@ -263,6 +276,10 @@
         statusSyncUnsupported: "This browser cannot access device step history",
         statusSyncSuccess: (steps) => `Synced ${steps.toLocaleString()} device steps`,
         statusWakeLockFailed: "Unable to keep the screen awake; counting may pause",
+        hintNoPedometer: "Device step sync is unavailable on iOS browsers",
+        hintNoWakeLock: "Counting may pause while the screen sleeps",
+        statusBackgroundSyncEnabled: "Background step counting is enabled",
+        statusBackgroundSyncFailed: "Failed to enable background step counting",
       }
     };
 
@@ -281,6 +298,7 @@
     const syncBtn = document.getElementById("sync-button");
     const shareBtn = document.getElementById("share-button");
     const statusLine = document.getElementById("status-line");
+    const supportLine = document.getElementById("support-line");
     const toggleLangBtn = document.getElementById("toggle-lang");
     const milestoneHintEl = document.getElementById("milestone-hint");
     const ambientRing = document.getElementById("ambient-ring");
@@ -300,8 +318,13 @@
     let wakeLockSentinel = null;
     let pedometerSensor = null;
     let pedometerSyncInFlight = false;
+    let backgroundWorker = null;
+    let backgroundSyncSupported = false;
 
     const shareTags = "#KGNINJA #Hosoo";
+    const supportsPedometer = "Pedometer" in window;
+    const supportsWakeLock = "wakeLock" in navigator;
+    const supportsBackgroundSync = "serviceWorker" in navigator && "PeriodicSyncManager" in window;
 
     const particles = [];
 
@@ -371,6 +394,24 @@
         titleEl.textContent = entry.title[language];
       }
       updateMilestoneHint();
+      updateSupportHints();
+    }
+
+    function updateSupportHints() {
+      const messages = [];
+      if (!supportsPedometer) {
+        messages.push(text[language].hintNoPedometer);
+        syncBtn.disabled = true;
+      } else if (!pedometerSyncInFlight) {
+        syncBtn.disabled = false;
+      }
+      if (!supportsWakeLock) {
+        messages.push(text[language].hintNoWakeLock);
+      }
+      if (backgroundSyncSupported) {
+        messages.push(text[language].statusBackgroundSyncEnabled);
+      }
+      supportLine.textContent = messages.join(" / ");
     }
 
     function updateMilestoneHint() {
@@ -557,6 +598,9 @@
       requestWakeLock();
       scheduleAmbient();
       window.addEventListener("devicemotion", handleMotion, { passive: true });
+      
+      // Initialize background worker for sleep mode tracking
+      await initializeBackgroundTracking();
     }
 
     function extractNativeStepCount(sensor) {
@@ -579,7 +623,7 @@
       if (pedometerSyncInFlight) {
         return;
       }
-      if (!("Pedometer" in window)) {
+      if (!supportsPedometer) {
         statusLine.textContent = text[language].statusSyncUnsupported;
         return;
       }
@@ -642,6 +686,83 @@
       }
     }
 
+    // Initialize background worker for sleep mode step tracking
+    async function initializeBackgroundTracking() {
+      try {
+        if ('Worker' in window) {
+          backgroundWorker = new Worker('./background-worker.js');
+          
+          backgroundWorker.addEventListener('message', handleWorkerMessage);
+          
+          // Start tracking in worker
+          backgroundWorker.postMessage({
+            type: 'startTracking'
+          });
+          
+          // Register periodic background sync if supported
+          if (supportsBackgroundSync && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'registerPeriodicSync'
+            });
+            backgroundSyncSupported = true;
+          }
+          
+          updateSupportHints();
+        }
+      } catch (error) {
+        console.warn('Failed to initialize background tracking:', error);
+        backgroundSyncSupported = false;
+        updateSupportHints();
+      }
+    }
+
+    // Handle messages from background worker
+    function handleWorkerMessage(event) {
+      const { type, data } = event.data;
+      
+      switch (type) {
+        case 'trackingStarted':
+          console.log('Background tracking started');
+          break;
+          
+        case 'stepUpdate':
+          if (data.steps > stepCount) {
+            stepCount = data.steps;
+            checkMilestones();
+            render();
+          }
+          break;
+          
+        case 'stepsSynced':
+          if (data.steps > stepCount) {
+            stepCount = data.steps;
+            checkMilestones();
+            render();
+          }
+          break;
+      }
+    }
+
+    // Stop background tracking
+    function stopBackgroundTracking() {
+      if (backgroundWorker) {
+        backgroundWorker.postMessage({
+          type: 'stopTracking'
+        });
+        backgroundWorker.terminate();
+        backgroundWorker = null;
+      }
+      
+      if (supportsBackgroundSync && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'unregisterPeriodicSync'
+        });
+      }
+      
+      backgroundSyncSupported = false;
+      updateSupportHints();
+    }
+
     toggleLangBtn.addEventListener("click", () => {
       setLanguage(language === "ja" ? "en" : "ja");
     });
@@ -687,6 +808,7 @@
     window.addEventListener("beforeunload", () => {
       if (tracking) {
         window.removeEventListener("devicemotion", handleMotion);
+        stopBackgroundTracking();
       }
       if (rafId) {
         clearTimeout(rafId);
@@ -708,6 +830,12 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && tracking) {
         requestWakeLock();
+        // Sync with background worker when page becomes visible
+        if (backgroundWorker) {
+          backgroundWorker.postMessage({
+            type: 'syncSteps'
+          });
+        }
       }
       if (!audioCtx) {
         return;
@@ -718,6 +846,22 @@
         ambientGain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 1.5);
       }
     });
+
+    // Handle messages from service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        const { type, data } = event.data;
+        
+        if (type === 'backgroundSync') {
+          // Sync with background worker on periodic sync
+          if (backgroundWorker && tracking) {
+            backgroundWorker.postMessage({
+              type: 'syncSteps'
+            });
+          }
+        }
+      });
+    }
 
     init();
   </script>

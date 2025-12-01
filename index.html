@@ -320,6 +320,7 @@
     let pedometerSyncInFlight = false;
     let backgroundWorker = null;
     let backgroundSyncSupported = false;
+    let backgroundWorkerReady = false;
 
     const shareTags = "#KGNINJA #Hosoo";
     const supportsPedometer = "Pedometer" in window;
@@ -689,25 +690,30 @@
     // Initialize background worker for sleep mode step tracking
     async function initializeBackgroundTracking() {
       try {
-        if ('Worker' in window) {
-          backgroundWorker = new Worker('./background-worker.js');
-          
-          backgroundWorker.addEventListener('message', handleWorkerMessage);
-          
-          // Start tracking in worker
-          backgroundWorker.postMessage({
-            type: 'startTracking'
-          });
-          
-          // Register periodic background sync if supported
-          if (supportsBackgroundSync && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({
-              type: 'registerPeriodicSync'
-            });
-            backgroundSyncSupported = true;
+        if (!('Worker' in window) || backgroundWorker || !supportsPedometer) {
+          return;
+        }
+
+        backgroundWorker = new Worker('./background-worker.js');
+
+        backgroundWorker.addEventListener('message', handleWorkerMessage);
+
+        // Start tracking in worker with current step baseline
+        backgroundWorker.postMessage({
+          type: 'startTracking',
+          data: { baseline: stepCount }
+        });
+
+        if (supportsBackgroundSync && 'serviceWorker' in navigator) {
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration?.active) {
+              registration.active.postMessage({ type: 'registerPeriodicSync' });
+            }
+          } catch (error) {
+            console.warn('Failed to register periodic sync', error);
+            statusLine.textContent = text[language].statusBackgroundSyncFailed;
           }
-          
-          updateSupportHints();
         }
       } catch (error) {
         console.warn('Failed to initialize background tracking:', error);
@@ -719,12 +725,22 @@
     // Handle messages from background worker
     function handleWorkerMessage(event) {
       const { type, data } = event.data;
-      
+
       switch (type) {
         case 'trackingStarted':
+          backgroundWorkerReady = true;
+          backgroundSyncSupported = true;
+          updateSupportHints();
           console.log('Background tracking started');
           break;
-          
+
+        case 'trackingError':
+          backgroundWorkerReady = false;
+          backgroundSyncSupported = false;
+          statusLine.textContent = text[language].statusBackgroundSyncFailed;
+          updateSupportHints();
+          break;
+
         case 'stepUpdate':
           if (data.steps > stepCount) {
             stepCount = data.steps;
@@ -752,14 +768,15 @@
         backgroundWorker.terminate();
         backgroundWorker = null;
       }
-      
+
       if (supportsBackgroundSync && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
           type: 'unregisterPeriodicSync'
         });
       }
-      
+
       backgroundSyncSupported = false;
+      backgroundWorkerReady = false;
       updateSupportHints();
     }
 
